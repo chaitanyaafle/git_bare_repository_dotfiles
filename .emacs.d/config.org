@@ -1,0 +1,642 @@
+#+TITLE: Emacs config file
+#+AUTHOR: Chaitanya Afle
+#+EMAIL: chafle@syr.edu
+#+OPTIONS: toc:nil
+#+DESCRIPTION: Configuration settings in org mode for emacs.d/config.el
+
+* The terminal
+I am trying ansi-term, which is good so far. 
+
+** Default shell should be bash
+Whenever I open terminal, it asks me what shell I want to use. 
+This function/set of commands tells that bash should be my default shell.
+#+BEGIN_SRC emacs-lisp
+  (defvar my-term-shell "/bin/bash")
+  (defadvice ansi-term (before force-bash)
+    (interactive (list my-term-shell)))
+  (ad-activate 'ansi-term)
+#+END_SRC
+
+** Keybinding to quickly start a shell session
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "<s-return>") 'ansi-term)
+#+END_SRC
+
+* Basic Interface Settings
+These are setting that do not depend on packages and are built-in enhancements to the UI.
+
+** Looks
+*** Remove the startup screen
+I don't want to go through the tutorial everytim I open emacs. 
+#+BEGIN_SRC emacs-lisp
+(setq inhibit-startup-message t)
+#+END_SRC
+*** Make Dashboard the default startup screen
+Instead of the lame starup screen, I'd prefer Dashboard. It works well together with
+projectile and shows my latest projects and files. 
+#+BEGIN_SRC emacs-lisp
+  (use-package dashboard
+    :ensure t
+    :config
+      (dashboard-setup-startup-hook)
+      (setq dashboard-items '((recents  . 10)))
+      (setq dashboard-banner-logo-title "--------------"))
+#+END_SRC
+
+*** Clock
+#+BEGIN_SRC emacs-lisp
+  (display-time-mode 1)
+#+END_SRC
+*** Disable menus and scrollbars
+If you like using any of those, change =-1= to =1=.
+#+BEGIN_SRC emacs-lisp
+  (tool-bar-mode -1)
+  ;; (menu-bar-mode -1)                   
+  (scroll-bar-mode -1)
+  (show-paren-mode 1)
+#+END_SRC
+
+*** Show line numbers
+I am using the package nlinum. Trying it out.
+#+BEGIN_SRC emacs-lisp
+  (use-package nlinum
+    :ensure t
+    :config
+    (global-nlinum-mode -1))
+#+END_SRC
+Instead i could just use the default one (currently commented out)
+#+BEGIN_SRC emacs-lisp
+  ;; (global-linum-mode t)
+#+END_SRC
+*** Show column in modeline
+#+BEGIN_SRC emacs-lisp
+  (column-number-mode 1)
+#+END_SRC
+*** Disable bell
+Remove the annoying bell sound when scrolling/hitting tabs with no return.
+#+BEGIN_SRC emacs-lisp
+(setq ring-bell-function 'ignore)
+#+END_SRC
+*** Set UTF-8 encoding
+#+BEGIN_SRC emacs-lisp 
+  ;; (setq locale-coding-system 'utf-8)
+  ;; (set-terminal-coding-system 'utf-8)
+  ;; (set-keyboard-coding-system 'utf-8)
+  ;; (set-selection-coding-system 'utf-8)
+  ;; (prefer-coding-system 'utf-8)
+#+END_SRC
+*** Highligh current line
+=hl-line= is awesome! It's not very awesome in the terminal version of emacs though, so we don't use that.
+Besides, it's only used for programming.
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'prog-mode-hook 'hl-line-mode)
+  (add-hook 'org-mode-hook 'hl-line-mode)
+#+END_SRC
+*** Pretty symbols
+Changes =lambda= to an actual symbol and a few others as well, only in the GUI version though.
+#+BEGIN_SRC emacs-lisp
+  (when window-system
+        (use-package pretty-mode
+        :ensure t
+        :config
+        (global-pretty-mode t)))
+#+END_SRC
+*** Text Size
+(set-face-attribute 'default (selected-frame) :height 256)
+** Functionality
+*** Disable backups and auto-saves
+I don't use either, you might want to turn those from =nil= to =t= if you do.
+#+BEGIN_SRC emacs-lisp
+  ;; (setq make-backup-files nil)
+  ;; (setq auto-save-default nil)
+#+END_SRC
+
+*** Change yes-or-no questions into y-or-n questions
+#+BEGIN_SRC emacs-lisp
+(defalias 'yes-or-no-p 'y-or-n-p)
+#+END_SRC
+
+*** Async
+Lets us use asynchronous processes wherever possible, pretty useful.
+#+BEGIN_SRC emacs-lisp
+  ;; (use-package async
+  ;;   :ensure t
+  ;;   :init (dired-async-mode 1))
+#+END_SRC
+
+*** Some basic Keybindings for ease of use on MacBooks
+#+BEGIN_SRC emacs-lisp
+  ;; (setq mac-command-modifier 'super)
+  (setq mac-option-modifier 'meta)
+#+END_SRC
+*** Smooth Scrolling
+#+BEGIN_SRC emacs-lisp
+  (setq scroll-conservatively 100)
+#+END_SRC
+* Which-key
+To aid in learning emacs. This give a list of possible completions if I am typing a command slowly
+#+BEGIN_SRC emacs-lisp
+  (use-package which-key
+    :ensure t
+    :init
+    (which-key-mode))
+#+END_SRC
+
+* Beacon mode
+To locate the exact position of the cursor when I change windows/frames. Might not be extremly uselful
+#+BEGIN_SRC emacs-lisp
+  (use-package beacon
+    :ensure t
+    :init
+    (beacon-mode 1))
+#+END_SRC
+
+* Electric 
+Auto completion for parenthesis, squarebrackets, curly brackets, etc.
+#+BEGIN_SRC emacs-lisp
+  (setq electric-pair-pairs '(
+                              (?\( . ?\))
+                              (?\[ . ?\])
+                              (?\{ . ?\})
+                              (?\" . ?\")
+                              ))
+  (electric-pair-mode t)
+#+END_SRC
+* Org
+** Basic config
+*** Source Windows
+#+BEGIN_SRC emacs-lisp
+  (setq org-src-window-setup 'current-window)
+  (require 'org-tempo)
+  (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+#+END_SRC
+*** Indenting
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'org-mode-hook 'org-indent-mode)
+#+END_SRC
+*** hide tags
+Thanks to John Kitchin's answer [[https://emacs.stackexchange.com/a/32039][here]].
+#+BEGIN_SRC emacs-lisp
+(defun org-toggle-tag-visibility (state)
+  "Run in `org-cycle-hook'."
+  (message "%s" state)
+  (cond
+   ;; global cycling
+   ((memq state '(overview contents showall))
+    (org-map-entries
+     (lambda ()
+       (let ((tagstring (nth 5 (org-heading-components)))
+         start end)
+     (when tagstring
+       (save-excursion
+         (beginning-of-line)
+         (re-search-forward tagstring)
+         (setq start (match-beginning 0)
+           end (match-end 0)))
+       (cond
+        ((memq state '(overview contents))
+         (outline-flag-region start end t))
+        (t
+         (outline-flag-region start end nil))))))))
+   ;; local cycling
+   ((memq state '(folded children subtree))
+    (save-restriction
+      (org-narrow-to-subtree)
+      (org-map-entries
+       (lambda ()
+     (let ((tagstring (nth 5 (org-heading-components)))
+           start end)
+       (when tagstring
+         (save-excursion
+           (beginning-of-line)
+           (re-search-forward tagstring)
+           (setq start (match-beginning 0)
+             end (match-end 0)))
+         (cond
+          ((memq state '(folded children))
+           (outline-flag-region start end t))
+          (t
+           (outline-flag-region start end nil)))))))))))
+
+(add-hook 'org-cycle-hook 'org-toggle-tag-visibility)
+#+END_SRC
+** Org Bullets and collapsed arrow
+#+BEGIN_SRC emacs-lisp
+  (use-package org-bullets
+    :ensure t
+    :config
+    (add-hook 'org-mode-hook (lambda () (org-bullets-mode))))
+#+END_SRC
+#+BEGIN_SRC emacs-lisp
+(setq org-ellipsis " ⤵")
+#+END_SRC
+** Org-ref and helm-bibtex
+#+BEGIN_SRC emacs-lisp
+  (require 'org-ref)
+
+  (setq reftex-default-bibliography '("~/org/research/ref/master.bib"))
+
+  (setq org-ref-bibliography-notes "~/org/research/ref/notes.org"
+        org-ref-default-bibliography '("~/org/research/ref/master.bib")
+        org-ref-pdf-directory "~/org/research/papers/")
+
+  (autoload 'helm-bibtex "helm-bibtex" "" t)
+
+  (setq bibtex-completion-bibliography "~/org/research/ref/master.bib"
+        bibtex-completion-library-path "~/org/research/papers/"
+        bibtex-completion-notes-path "~/org/research/notes")
+
+  ;; (setq bibtex-completion-pdf-open-function 'org-open-file)
+#+END_SRC
+** Org-pdf
+#+BEGIN_SRC emacs-lisp
+  ;; (use-package org-pdfview
+  ;;     :ensure t)
+  ;; (eval-after-load 'org '(require 'org-pdfview))
+  ;; (add-to-list 'org-file-apps 
+  ;;              '("\\.pdf\\'" . (lambda (file link)
+  ;;                                      (org-pdfview-open link))))
+  ;; (add-to-list 'org-file-apps 
+  ;;              '("\\.pdf\\'" . default))
+#+END_SRC
+** Interleave
+#+BEGIN_SRC emacs-lisp
+(use-package interleave
+    :ensure t)
+#+END_SRC
+** Org-contacts
+#+BEGIN_SRC emacs-lisp
+(use-package org-contacts
+  :ensure nil
+  :custom (org-contacts-files '("~/org/personal/contacts.org")))
+#+END_SRC
+** Agenda
+*** Set keybinding
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-c a") 'org-agenda)
+#+END_SRC
+*** Define agenda files
+#+BEGIN_SRC emacs-lisp
+  (setq org-agenda-files (list "~/org/research/research.org"
+                               "~/org/personal/tasks.org"
+                               "~/org/personal/articles.org"
+                               "~/org/personal/buy.org"
+                               "~/org/personal/books.org"
+                               "~/org/public/blog.org"))     
+;(setq org-archive-location (concat org-directory "/research/research_archive.org::"))
+#+END_SRC
+** Org-capture
+
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-c c") 'org-capture)
+#+END_SRC
+#+BEGIN_SRC emacs-lisp
+(setq org-default-notes-file (concat org-directory "~/org/notes/notes.org"))
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+
+      (setq org-capture-templates
+              '(("r" "Research related tasks")
+                ("rc" "Current primary research project: Supernovae beta_estimation" entry
+                 (file "~/org/research/beta_estimation.org")
+                 "* TODO %?\n  %i\n  %a")
+                ("re" "Add a task inteded to make Emacs experice better" entry
+                 (file+headline "~/org/research/base.org" "Emacs")
+                 "* TODO %?\n  %i\n  %a")
+                ("rp" "Improve python skills" entry
+                 (file+headline "~/org/research/base.org" "Python")
+                 "* TODO %?\n  %i\n  %a")
+                ("rC" "Computation skills" entry
+                 (file+headline "~/org/research/base.org" "Computation")
+                 "* TODO %?\n  %i\n  %a")
+                ("rr" "Entry of a new article to read" entry
+                 (file "~/org/research/overview.org"))
+
+
+                ("j" "journal entries") 
+                ("j" "Journal" entry (file+datetree "~/org/personal/journal.org")
+                 "* %?\nEntered on %U\n  %i\n  %a")
+
+                ("l" "Literature material")
+                ("la" "Articles to read" entry (file "~/org/personal/articles.org")
+                 "* %?\nEntered on %U\n  %i\n  %a")
+                ("lb" "Book to read" entry (file+headline "~/org/personal/books.org" "To-read")
+                 "* %?\n Author(s): %^{AUTHORNAME(S)}\n [[%^{url}][%^{url name}]] \nEntered on %U\n")
+
+                ("b" "Buy")
+                ("bu" "Urgent item to buy" checkitem (file+headline "~/org/personal/buy.org" "Urgent")
+                 " [ ] %? | Entered on %T\n")
+                ("bg" "Grocery list" entry (file+headline "~/org/personal/buy.org" "Grocery")
+                 " - [ ] %? | Entered on %T\n")
+                ("bo" "Online list" entry (file+headline "~/org/personal/buy.org" "Online")
+                 " [ ] %? | Link: %a | Entered on %U\n")
+                ("bl" "Long term list" entry (file+headline "~/org/personal/buy.org" "Long term")
+                 " [ ] %? | Entered on %U\n")
+
+                ("p" "philosophical entries")
+                ("pt" "Thoughts/ Quotes" entry (file "~/org/personal/thoughts.org")
+                 "* '%?' \n - by %^{PROMPT}   | Entered on %U\n")
+                ("pr" "In retrospect ..." entry (file "~/org/personal/retrospect.org")
+                 "* %? \n | Entered on %U\n")
+
+
+                ("t" "Tasks" entry (file+headline "~/org/personal/tasks.org" "Scheduled tasks")
+                "** TODO %?\n %^T")
+
+                ;; ("c" "Contact" entry (file+headline "~/org/personal/contacts.org" "Friends")
+                ;; my/org-contacts-template
+                ;; :empty-lines 1)
+
+                ("c" "Contacts" entry (file "~/org/personal/contacts.org")
+                "* %(org-contacts-template-name)
+    :PROPERTIES:
+    :BIRTHDAY: %^
+    :ADDRESS: %^(ADDRESS)
+  :PHONE: %^(PHONE NUMBER(s))
+    :EMAIL: %(org-contacts-template-email)
+    :END:")
+
+                ))
+#+END_SRC
+** Org-table auto increment
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-c M-RET") 'org-table-copy-down)
+#+END_SRC
+
+* IDO
+** enable ido mode
+#+BEGIN_SRC emacs-lisp
+  (setq ido-enable-flex-matching nil)
+  (setq ido-create-new-buffer 'always)
+  (setq ido-everywhere t)
+  (ido-mode 1)
+#+END_SRC
+** ido vertical
+#+BEGIN_SRC emacs-lisp
+  (use-package ido-vertical-mode
+    :ensure t
+    :init
+    (ido-vertical-mode 1))
+  (setq ido-vertical-define-keys 'C-n-and-C-p-only)
+#+END_SRC
+** smex
+#+BEGIN_SRC emacs-lisp
+  (use-package smex
+    :ensure t
+    :init (smex-initialize)
+    :bind
+    ("M-x" . smex))
+#+END_SRC
+** switch-buffers
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-x C-b") 'ido-switch-buffer)
+#+END_SRC
+* Buffers
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-x b") 'ibuffer)
+#+END_SRC
+** expert mode
+If you want to kill the current buffer by using C-x k and don't want to be prompted to confirm killing the current buffer.
+
+* Avy
+#+BEGIN_SRC emacs-lisp
+  (use-package avy
+    :ensure t
+    :bind
+    ("M-s" . avy-goto-char)) 
+#+END_SRC
+* Config/init reload
+** editing
+#+BEGIN_SRC emacs-lisp
+  (defun config-visit ()
+    (interactive)
+    (find-file "~/.emacs.d/config.org"))
+  (global-set-key (kbd "C-c e") 'config-visit)
+#+END_SRC
+** executing/reloading
+#+BEGIN_SRC emacs-lisp
+  (defun config-reload ()
+    (interactive)
+    (org-babel-load-file (expand-file-name "~/.emacs.d/config.org")))
+  (global-set-key (kbd "C-c r") 'config-reload)
+#+END_SRC
+* switching windows
+#+BEGIN_SRC emacs-lisp
+  (use-package switch-window
+    :ensure t
+    :config
+    (setq switch-window-input-style 'minibuffer)
+    (setq switch-window-increase 4)
+    (setq switch-window-threshold 2)
+    (setq switch-window-shortcut-style 'qwerty)
+    (setq switch-window-qwerty-shortcuts
+          '("a" "s" "d" "f" "h" "j" "k" "l"))
+    :bind
+    ([remap other-window] . switch-window))
+     
+#+END_SRC
+* Window splitting functions
+** Horizontal splitting
+#+BEGIN_SRC emacs-lisp
+  (defun split-and-follow-horizontally ()
+    (interactive)
+    (split-window-below)
+    (balance-windows)
+    (other-window 1))
+  (global-set-key (kbd "C-x 2") 'split-and-follow-horizontally)
+#+END_SRC
+** Vertical splitting
+#+BEGIN_SRC emacs-lisp
+  (defun split-and-follow-vertically ()
+    (interactive)
+    (split-window-right)
+    (balance-windows)
+    (other-window 1))
+  (global-set-key (kbd "C-x 3") 'split-and-follow-vertically)
+#+END_SRC
+   
+* Subword
+In case you use camelCase variable names
+#+BEGIN_SRC emacs-lisp
+  (global-subword-mode 1)
+#+END_SRC
+* Convenient functions
+** kill whole word
+Vim users, be happy.
+#+BEGIN_SRC emacs-lisp
+  (defun kill-whole-word ()
+    (interactive)
+    (backward-word)
+    (kill-word 1))
+  (global-set-key (kbd "C-c w w ") 'kill-whole-word)
+#+END_SRC
+** copy whole line
+#+BEGIN_SRC emacs-lisp
+  (defun copy-whole-line ()
+    (interactive)
+    (save-excursion
+      (kill-new
+       (buffer-substring
+        (point-at-bol)
+        (point-at-eol)))))
+  (global-set-key (kbd "C-c w l") 'copy-whole-line)
+#+END_SRC
+* Hungry delete
+#+BEGIN_SRC emacs-lisp
+  (use-package hungry-delete
+    :ensure t
+    :config (global-hungry-delete-mode))
+#+END_SRC
+* Rainbow
+#+BEGIN_SRC emacs-lisp
+  (use-package rainbow-mode
+    :ensure t
+    :init (rainbow-mode 1))
+#+END_SRC
+#+BEGIN_SRC emacs-lisp
+  (use-package rainbow-delimiters
+    :ensure t
+    :init
+    (rainbow-delimiters-mode 1))
+#+END_SRC
+* Auto-completion/Company
+** Company
+Company is good for C/C++
+#+BEGIN_SRC emacs-lisp
+  (use-package company
+    :ensure t
+    :init
+    (add-hook 'after-init-hook 'global-company-mode)
+    :config
+    (setq company-idle-delay 0)
+    (setq company-minimum-prefix-length 3))
+#+END_SRC
+** Auto-complete
+Auto-complete is good for python, etc.
+#+BEGIN_SRC emacs-lisp
+  (use-package auto-complete
+    :ensure t
+    :config
+    (ac-config-default))
+  (global-auto-complete-mode t)
+#+END_SRC
+* Modline
+** theme
+#+BEGIN_SRC emacs-lisp
+  (use-package spaceline
+    :ensure t
+    :config
+    (require 'spaceline-config)
+    (setq powerline-image-apple-rgb t)
+    (setq powerline-default-separator 'slant)
+    (spaceline-emacs-theme)
+    (spaceline-toggle-buffer-size-off)
+    (spaceline-toggle-window-number-on)
+    (spaceline-toggle-workspace-number-on)
+    (spaceline-toggle-buffer-id-on))
+#+END_SRC
+** diminish
+#+BEGIN_SRC emacs-lisp
+  (use-package diminish
+    :ensure t
+    :init
+    (diminish 'hungry-delete-mode)
+    (diminish 'beacon-mode)
+    (diminish 'subword-mode)
+    (diminish 'rainbow-mode)
+    (diminish 'which-key-mode))
+#+END_SRC
+* Kill-ring
+#+BEGIN_SRC emacs-lisp
+  (use-package popup-kill-ring
+    :ensure t
+    :bind
+    ("M-y" . popup-kill-ring))
+#+END_SRC
+* Line numbering
+** line numbers and programming
+Every now and then all of us feel the urge to be productive and write some code.
+In the event that this happens, the following bit of configuration makes sure that 
+we have access to relative line numbering in programming-related modes.
+I highly recommend not enabling =linum-relative-mode= globally, as it messed up 
+something like =ansi-term= for instance.
+#+BEGIN_SRC emacs-lisp
+  (use-package linum-relative
+    :ensure t
+    :config
+      (setq linum-relative-current-symbol "")
+      (add-hook 'prog-mode-hook 'linum-relative-mode 1))
+#+END_SRC
+
+* Swiper
+#+BEGIN_SRC emacs-lisp
+  (use-package swiper
+    :ensure t
+    :bind ("C-s" . swiper))
+#+END_SRC
+
+* Mark multiple
+#+BEGIN_SRC emacs-lisp
+  (use-package mark-multiple
+    :ensure t
+    :bind ("C-c q" . 'mark-next-like-this))
+#+END_SRC
+* Expand Region
+#+BEGIN_SRC emacs-lisp
+  (use-package expand-region
+    :ensure t
+    :bind ("C-=" . er/expand-region)
+    :bind ("C--" . er/contract-region))
+#+END_SRC
+* Fill column indicator line
+To show a line after 72 chars
+#+BEGIN_SRC emacs-lisp
+  (use-package fill-column-indicator
+    :ensure t)
+  (fci-mode t)
+#+END_SRC
+* Python IDE
+
+* PDF tools
+This required a LOT of workarounds. However, finally [[https://emacs.stackexchange.com/a/22591][this]] answer worked.
+Also look at the comments on that answer to install pdf-tools via brew.
+
+If this gives error saying autoreconf is not installed, 
+then run the executable in the terminal. This is from one of the answers in the above link
+
+Have a look at [[http://mbork.pl/2016-06-13_Displaying_pdfs_on_the_right][this post]] to tweak pdf-tools.
+
+
+
+#+BEGIN_SRC emacs-lisp
+  (use-package pdf-tools
+    :ensure t
+    :config
+    (custom-set-variables
+      '(pdf-tools-handle-upgrades nil)) ; Use brew upgrade pdf-tools instead.
+    (setq pdf-info-epdfinfo-program "/usr/local/bin/epdfinfo"))
+  (pdf-tools-install)
+#+END_SRC
+
+
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'doc-view-mode-hook
+    (lambda ()
+      (linum-mode -1)
+    ))					
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  ;; (when (memq window-system '(mac ns))
+  ;;       ;; solves issue of not buildling in macOS
+  ;;       (setenv "PKG_CONFIG_PATH" "/usr/local/lib/pkgconfig:/usr/local/Cellar/libffi/3.2.1/lib/pkgconfig"))
+#+END_SRC
+ 
+* Openwith
+Open pdf in preview/skim
+#+begin_src emacs-lisp
+(require 'openwith)
+(openwith-mode t)
+(setq openwith-associations '(("\\.pdf\\'" "preview" (file))))
+#+end_src
